@@ -1,0 +1,21 @@
+# Runtime outputs
+data/
+artifacts/
+cache/
+dist/
+build/
+*.egg-info/
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.venv/
+venv/
+
+# Local environment
+.env
+.env.*
+!.env.example
