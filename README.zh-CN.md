@@ -42,6 +42,35 @@ python -m pip install -e ".[dev]"
 python -m pytest tests -q
 ```
 
+## 给智能体的安装提示词
+
+把下面这段提示词交给 AI 编程智能体，让它自己安装或内化这个工作流，而不是让你
+手动一点点配置：
+
+```text
+请把这个仓库内化为一个论文蒸馏工作流，用于从大量论文构建 QA 和多轮对话训练数据集。
+
+仓库地址：https://github.com/wicm84266964/paper-distill
+
+请阅读 README.md 和 skills/paper_distill/SKILL.md。如果你的运行环境支持可复用
+skill 或智能体指令，请把 skills/paper_distill 安装或注册为名叫 paper_distill
+的 skill。如果不支持，请把 SKILL.md 内化为当前项目或当前会话里的长期操作规范。
+
+当你协助我使用这个项目时：
+- 把 Python CLI 作为稳定接口，不要用临时脚本重新实现论文蒸馏逻辑。
+- 认为 `paper-distill run` 的执行粒度是一篇论文。
+- 处理文献库时，对每篇论文分别运行一个任务，写入同一个 artifacts root，最后把
+  所有有效论文 artifact 合并导出成一个大数据集文件。
+- 不要让两个 worker 同时处理同一篇源论文和同一个 artifacts root。
+- 真实模型生成前，先用 mock backend 做 smoke test。
+- 不要把源论文、生成数据集、缓存、API key 或本机运行产物写入仓库，除非我明确
+  要求保留脱敏样例。
+- 真实生成前检查 backend、model、base URL、API key 环境变量、目标语言、
+  artifacts root 和导出格式。
+- 汇报处理了多少篇论文、每篇论文 artifact 写到哪里、生成了哪个导出文件，以及
+  是否有失败或跳过的论文。
+```
+
 ## 单篇论文快速验证
 
 创建一个很小的 Markdown 论文：

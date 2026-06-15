@@ -50,6 +50,39 @@ python -m pip install -e ".[dev]"
 python -m pytest tests -q
 ```
 
+## Agent Setup Prompt
+
+Give this prompt to an AI coding agent so it can install or internalize the
+workflow instead of making you configure every step manually:
+
+```text
+Please adopt this repository as a paper-distillation workflow for building
+large paper-derived QA and multi-turn conversation datasets.
+
+Repository: https://github.com/wicm84266964/paper-distill
+
+Read README.md and skills/paper_distill/SKILL.md. If your environment supports
+reusable skills or agent instructions, install or register skills/paper_distill
+as a skill named paper_distill. If it does not, internalize SKILL.md as durable
+operating instructions for this project or session.
+
+When helping me use this project:
+- Use the Python CLI as the stable interface; do not reimplement the
+  distillation logic in ad hoc scripts.
+- Treat `paper-distill run` as a one-paper execution unit.
+- For a corpus, run one job per paper under the same artifacts root, then export
+  all valid paper artifacts into one combined dataset file.
+- Do not run two workers against the same source paper and same artifacts root
+  at the same time.
+- Use the mock backend for smoke tests before real model generation.
+- Keep source papers, generated datasets, caches, API keys, and local run
+  artifacts out of the repository unless I explicitly ask for sanitized samples.
+- Before real generation, verify backend, model, base URL, API key environment,
+  target language, artifacts root, and export format.
+- Report how many papers were processed, where per-paper artifacts were written,
+  which export file was produced, and any failed or skipped papers.
+```
+
 ## Single-paper Smoke Test
 
 Create a tiny Markdown paper:
