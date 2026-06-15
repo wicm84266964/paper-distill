@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from app.paper_distill.language import target_language_instruction
+
 
 PROMPT_VERSION = "paper_distill/conversation_distill/v6"
 KNOWLEDGE_MAP_VERSION = "paper_distill/knowledge_map/v1"
@@ -10,10 +12,12 @@ SOURCE_MARKDOWN_MARKER = "[[SOURCE_MARKDOWN]]"
 KNOWLEDGE_MAP_MARKER = "[[KNOWLEDGE_MAP]]"
 
 
-def build_stable_prefix(*, title: str, normalized_source: str) -> str:
+def build_stable_prefix(*, title: str, normalized_source: str, target_language: str = "Chinese") -> str:
+    language_instruction = target_language_instruction(target_language)
     lines = [
         "You distill a single paper into context-rich training conversations and QA pairs.",
         f"Prompt-Version: {PROMPT_VERSION}",
+        language_instruction,
         "The primary goal is knowledge distillation, not trivia extraction.",
         "Write knowledge-oriented training data, not article-oriented commentary about 'this paper' or 'this study'.",
         "Generate grounded multi-turn user/assistant exchanges only from the provided source.",
@@ -28,8 +32,6 @@ def build_stable_prefix(*, title: str, normalized_source: str) -> str:
         "Avoid unresolved article-internal references such as 本文, 该文, 这篇文章, 图1, 图2, 表1, 表2, 前者, 后者, 上述, 以下.",
         "Avoid opening with continuity-only phrasing such as 前面已经说到, 继续, 最后, 进一步, 这种, 这样, 它, 它们 unless the same sentence immediately names the concrete study subject or condition.",
         "If a figure or table supports the evidence, put that reference in evidence_locator, and restate the concrete comparison or finding in the question and answer.",
-        "Write the question and answer in Chinese even when the source paper is in English.",
-        "Translate grounded source content into natural Chinese instead of preserving English sentence structure.",
         "Each item must include question, answer, evidence_text, and evidence_locator.",
         SOURCE_MARKDOWN_MARKER,
         f"Title: {title}",
@@ -38,14 +40,15 @@ def build_stable_prefix(*, title: str, normalized_source: str) -> str:
     return "\n\n".join(lines).strip() + "\n"
 
 
-def build_knowledge_map_prefix(*, title: str, normalized_source: str) -> str:
+def build_knowledge_map_prefix(*, title: str, normalized_source: str, target_language: str = "Chinese") -> str:
+    language_instruction = target_language_instruction(target_language)
     lines = [
         "You extract a reusable knowledge map from a single paper.",
         f"Knowledge-Map-Version: {KNOWLEDGE_MAP_VERSION}",
+        language_instruction,
         "Return grounded structured data only from the provided source.",
         "Capture the study goal, object, design, treatments, metrics, findings, limitations, and recommendations.",
         "Prefer the paper body over the abstract when both are available.",
-        "Write all extracted schema string fields in Chinese even when the source paper is in English.",
         SOURCE_MARKDOWN_MARKER,
         f"Title: {title}",
         normalized_source.rstrip("\n"),
@@ -76,21 +79,26 @@ def build_knowledge_map_suffix() -> str:
             "Include 2 to 8 items for list fields when the source supports them.",
             "Use content_profile=abstract_only when the source is mostly abstract metadata without a real body.",
             "Prefer methods, results, discussion, tables, and figures over abstract-only restatements when available.",
-            "Write all non-enum schema values in Chinese.",
         ],
     }
     return json.dumps(payload, ensure_ascii=False, indent=2, sort_keys=True)
 
 
-def build_conversation_plan_prefix(*, title: str, knowledge_map_outline: dict[str, object]) -> str:
+def build_conversation_plan_prefix(
+    *,
+    title: str,
+    knowledge_map_outline: dict[str, object],
+    target_language: str = "Chinese",
+) -> str:
+    language_instruction = target_language_instruction(target_language)
     lines = [
         "You plan one paper-distillation conversation set from a reusable knowledge map.",
         f"Conversation-Plan-Version: {CONVERSATION_PLAN_VERSION}",
+        language_instruction,
         "Design 1 to 3 coherent conversation threads that together cover the paper's most valuable knowledge.",
         "Prefer a small number of dense, context-preserving threads over many shallow threads.",
         "Size each thread around distinct knowledge coverage rather than filling a large turn budget with near-repeated questions.",
         "Plan threads around transferable knowledge clusters, not around article navigation phrases such as 'the paper says' or 'Figure 1/Table 1'.",
-        "Write topic, rationale, must_cover, and start_context in Chinese even when the source paper is in English.",
         "If the paper has body results, do not let the whole plan collapse into repeated setup-only turns.",
         KNOWLEDGE_MAP_MARKER,
         f"Title: {title}",
@@ -125,7 +133,6 @@ def build_conversation_plan_suffix(*, target_turn_count: int) -> str:
             "Do not inflate a thread budget by repeating the same result cluster with slightly different wording.",
             "If target_turn_count is 4 or less and the paper body has results, spend at most 1 turn on setup or design before moving to results, comparisons, limitations, or recommendations.",
             "Do not assign every turn to methods or setup if the knowledge map contains quantitative findings or comparisons.",
-            "Write every thread field in Chinese.",
         ],
         "target_turn_count": target_turn_count,
     }
@@ -139,6 +146,7 @@ def build_generation_suffix(
     target_count: int,
     existing_questions: tuple[str, ...],
     knowledge_map_outline: dict[str, object] | None = None,
+    target_language: str = "Chinese",
 ) -> str:
     payload = {
         "task": "continue_paper_distillation",
@@ -167,7 +175,7 @@ def build_generation_suffix(
             "Continuity phrases such as 前面已经说到, 继续, 最后, 进一步, 这种, 这样, 它, and 它们 are allowed only when the same sentence also names the concrete study object, treatment, condition, metric, or application scene.",
             "Keep answers concise but faithful to the source, and include key numbers when present.",
             "Prefer methods, results, discussion, tables, and figures over abstract-only restatements when the body contains the needed evidence.",
-            "Write both questions and answers in Chinese even when the source paper is in English.",
+            target_language_instruction(target_language),
             "Diversify coverage across study goal, design, methods, results, comparison, interpretation, limitations, and recommendation when supported by the source.",
             "Avoid repeating or lightly rephrasing any existing question.",
             "Evidence text should be a short source-grounded excerpt or paraphrase anchor.",
@@ -193,6 +201,7 @@ def build_conversation_generation_suffix(
     existing_thread_turns: tuple[dict[str, str], ...],
     existing_questions: tuple[str, ...],
     knowledge_map_outline: dict[str, object],
+    target_language: str = "Chinese",
 ) -> str:
     payload = {
         "task": "generate_conversation_turns",
@@ -232,7 +241,7 @@ def build_conversation_generation_suffix(
             "If the source only provides exact numbers for part of a requested multi-condition comparison, narrow the question instead of answering the missing part vaguely.",
             "Answers should be knowledge-rich rather than terse: when the source supports it, include study context, the key result, and one comparison, interpretation, limitation, or implication sentence.",
             "For multi-part, comparative, trend, recovery, mechanism, or limitation questions, prefer 2 to 4 sentences rather than a single short sentence.",
-            "Keep both questions and answers in Chinese even when the source paper is in English.",
+            target_language_instruction(target_language),
             "Avoid repeating or lightly rephrasing any existing question across the paper.",
             "Evidence text should be a short grounded excerpt or paraphrase anchor.",
             "Evidence locator should name the section, table, or figure when possible.",

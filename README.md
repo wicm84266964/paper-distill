@@ -3,7 +3,7 @@
 中文说明见 [README.zh-CN.md](README.zh-CN.md).
 
 Corpus-oriented Python package for distilling many Markdown papers into
-Chinese-first QA and multi-turn conversation training datasets.
+QA and multi-turn conversation training datasets.
 
 The execution unit is one paper at a time, but the intended workflow is a
 large literature corpus: run each paper into its own resumable artifact
@@ -22,8 +22,8 @@ directory, then export all paper artifacts into one combined dataset file.
   one combined dataset file.
 - Exports QA records and conversation records as `json`, `jsonl`, or
   `conversation-jsonl`.
-- Writes generated questions, answers, knowledge maps, and conversations in
-  Chinese even when the source paper is English.
+- Generates questions, answers, knowledge maps, and conversations in a
+  configurable target language.
 - Supports resumable runs and deterministic smoke tests through a built-in
   `mock` backend.
 
@@ -135,6 +135,24 @@ workers for the same source paper and same `artifacts_root` at the same time.
 paper. It is not the number of papers to process. `--batch-size` controls how
 many candidate turns the backend asks for in one generation call.
 
+## Target Language
+
+Generated dataset fields use Chinese by default to preserve the original
+workflow, but the output language is configurable:
+
+```powershell
+paper-distill run --paper papers\example.md --target-count 20 --target-language English --backend openai-compatible
+```
+
+You can also set:
+
+```powershell
+$env:PAPER_DISTILL_TARGET_LANGUAGE = "English"
+```
+
+Use `source language` if you want generated fields to follow the primary
+language of each source paper.
+
 ## Real Model Backend
 
 Use any OpenAI-compatible chat completions service:
@@ -144,6 +162,7 @@ $env:PAPER_DISTILL_BACKEND = "openai-compatible"
 $env:PAPER_DISTILL_MODEL = "<model name>"
 $env:PAPER_DISTILL_BASE_URL = "<https://provider.example/v1>"
 $env:PAPER_DISTILL_API_KEY = "<api key>"
+$env:PAPER_DISTILL_TARGET_LANGUAGE = "English"
 
 paper-distill run --paper papers\example.md --auto-target-count --backend openai-compatible
 ```

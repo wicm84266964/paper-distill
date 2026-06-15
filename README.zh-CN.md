@@ -1,7 +1,6 @@
 # Paper Distill
 
-用于把大量 Markdown 论文蒸馏成中文优先 QA / 多轮对话训练数据集的独立
-Python 包。
+用于把大量 Markdown 论文蒸馏成 QA / 多轮对话训练数据集的独立 Python 包。
 
 它的执行粒度是“每次处理一篇论文”，但目标工作流是文献库级别的：对上百篇或
 上千篇论文逐篇运行、逐篇保存可续跑 artifact，最后把所有论文 artifact 合并导出
@@ -17,7 +16,7 @@ Python 包。
   聚合的多轮 conversation 记录。
 - 导出时既可以只导出一篇论文，也可以把同一个 `artifacts_root` 下的所有论文合并成一个大数据集文件。
 - 导出 `json`、`jsonl`、`conversation-jsonl` 格式的 QA / 对话训练记录。
-- 即使原论文是英文，也会把生成的问题、回答、知识图谱和对话记录写成中文。
+- 支持配置生成问题、回答、知识图谱和对话记录时使用的目标语言。
 - 支持断点续跑。
 - 内置 `mock` backend，可以不接模型服务就做 smoke test。
 
@@ -126,6 +125,22 @@ paper-distill export --artifact-dir data\paper_distill\papers\<paper_id> --forma
 `--target-count` 表示单篇论文要生成/接受的 conversation turn 数量，不是论文
 数量。`--batch-size` 表示每次模型调用请求多少个候选 turn。
 
+## 目标语言
+
+为了兼容原始工作流，生成字段默认使用 Chinese，但目标语言可以配置：
+
+```powershell
+paper-distill run --paper papers\example.md --target-count 20 --target-language English --backend openai-compatible
+```
+
+也可以通过环境变量设置：
+
+```powershell
+$env:PAPER_DISTILL_TARGET_LANGUAGE = "English"
+```
+
+如果希望生成字段跟随每篇论文的原文主语言，可以使用 `source language`。
+
 ## 使用真实模型
 
 真实生成时，使用任意 OpenAI-compatible chat completions 服务：
@@ -135,6 +150,7 @@ $env:PAPER_DISTILL_BACKEND = "openai-compatible"
 $env:PAPER_DISTILL_MODEL = "<model name>"
 $env:PAPER_DISTILL_BASE_URL = "<https://provider.example/v1>"
 $env:PAPER_DISTILL_API_KEY = "<api key>"
+$env:PAPER_DISTILL_TARGET_LANGUAGE = "English"
 
 paper-distill run --paper papers\example.md --auto-target-count --backend openai-compatible
 ```

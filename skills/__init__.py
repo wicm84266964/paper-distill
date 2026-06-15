@@ -1,1 +1,1 @@
-"""Host-agnostic skill bundles shipped with the repository."""
+"""Optional agent contracts shipped with the repository."""

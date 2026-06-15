@@ -79,7 +79,59 @@ class PaperDistillCliTests(unittest.TestCase):
             self.assertTrue(service.request.auto_target_count)
             self.assertEqual(service.request.min_target_count, 5)
             self.assertEqual(service.request.max_target_count, 7)
+            self.assertEqual(service.request.target_language, "Chinese")
             self.assertIn("target_count=7", stdout.getvalue())
+
+    def test_run_command_accepts_target_language(self) -> None:
+        class _CapturingService:
+            def __init__(self) -> None:
+                self.request: RunRequest | None = None
+
+            def run(self, request: RunRequest) -> DistillRunResult:
+                self.request = request
+                return DistillRunResult(
+                    paper_id="paper-1",
+                    artifact_dir=Path("artifacts"),
+                    accepted_count=1,
+                    entries_written=1,
+                    cache_status=CacheStatus.CREATED,
+                    run_status=RunStatus.COMPLETED,
+                    target_count=1,
+                )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            workspace_root = Path(temporary_directory)
+            paper_path = workspace_root / "paper.md"
+            _ = paper_path.write_text(SAMPLE_PAPER, encoding="utf-8")
+            service = _CapturingService()
+            stdout = io.StringIO()
+            stderr = io.StringIO()
+
+            with (
+                patch("app.paper_distill.cli.build_service", return_value=service),
+                patch("sys.stdout", stdout),
+                patch("sys.stderr", stderr),
+            ):
+                exit_code = main(
+                    [
+                        "run",
+                        "--workspace-root",
+                        str(workspace_root),
+                        "--paper",
+                        "paper.md",
+                        "--target-count",
+                        "1",
+                        "--backend",
+                        "mock",
+                        "--target-language",
+                        "English",
+                    ]
+                )
+
+            self.assertEqual(exit_code, 0)
+            self.assertEqual(stderr.getvalue(), "")
+            self.assertIsNotNone(service.request)
+            self.assertEqual(service.request.target_language, "English")
 
     def test_run_command_does_not_resolve_paper_path_in_cli(self) -> None:
         class _CapturingService:

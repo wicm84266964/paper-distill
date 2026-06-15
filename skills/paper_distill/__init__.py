@@ -1,1 +1,1 @@
-"""Portable skill bundle for the standalone paper_distill capability."""
+"""Optional agent contract for the standalone paper_distill capability."""

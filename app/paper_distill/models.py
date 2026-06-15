@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
 
+from app.paper_distill.language import DEFAULT_TARGET_LANGUAGE
 from app.types import JSONValue
 from app.utils import utc_now
 
@@ -460,6 +461,7 @@ class RunRequest:
     min_target_count: int = 6
     max_target_count: int = 24
     restart: bool = False
+    target_language: str = DEFAULT_TARGET_LANGUAGE
 
 
 @dataclass(slots=True, frozen=True)

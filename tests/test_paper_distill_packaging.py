@@ -26,6 +26,7 @@ class PaperDistillPackagingTests(unittest.TestCase):
         self.assertIn("PAPER_DISTILL_MODEL", env_example)
         self.assertIn("PAPER_DISTILL_BASE_URL", env_example)
         self.assertIn("PAPER_DISTILL_API_KEY", env_example)
+        self.assertIn("PAPER_DISTILL_TARGET_LANGUAGE", env_example)
 
     def test_skill_bundle_exists_with_stable_contract_markers(self) -> None:
         skill_path = Path(__file__).resolve().parents[1] / "skills" / "paper_distill" / "SKILL.md"

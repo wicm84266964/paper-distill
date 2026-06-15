@@ -1,6 +1,6 @@
 ---
 name: paper-distill
-description: Build Chinese-first QA and multi-turn conversation datasets from markdown paper corpora by running one resumable paper-distill job per paper and exporting all paper artifacts into combined JSON/JSONL datasets.
+description: Build QA and multi-turn conversation datasets from markdown paper corpora by running one resumable paper-distill job per paper and exporting all paper artifacts into combined JSON/JSONL datasets.
 ---
 
 # Paper Distill Skill
@@ -14,7 +14,9 @@ without reimplementing the `paper_distill` subsystem.
 
 This bundle is intentionally host-agnostic. It teaches a host how to invoke the already-existing command surface instead of embedding host-specific tool schemas.
 
-All distillation outputs should be written in Chinese, even when the source paper is in English, because the downstream training target is a Chinese-base model.
+Generated dataset fields use Chinese by default for backwards compatibility,
+but the target language is configurable with `--target-language` or
+`PAPER_DISTILL_TARGET_LANGUAGE`.
 
 `paper-distill run` is a single-paper operation by design, but the intended
 workflow is corpus-scale. For hundreds or thousands of papers, invoke `run` once
@@ -33,7 +35,7 @@ output dataset file.
   resumable distillation job per paper and exporting the shared artifacts root.
 - The user wants to resume or restart a paper-specific distillation run.
 - The user wants to export merged paper-distill outputs to `json` or `jsonl`.
-- The user wants English-language papers to be distilled into Chinese training data.
+- The user wants to control the generated dataset language.
 
 ## When not to use
 
@@ -93,6 +95,7 @@ Optional for `run`:
 - `--workspace-root <path>`
 - `--artifacts-root <path>`
 - `--cache-root <path>`
+- `--target-language <language>`
 - `--backend mock|openai-compatible`
 - `--model <name>`
 - `--base-url <url>`
@@ -214,6 +217,7 @@ Optional environment variables already supported by the CLI:
 - `PAPER_DISTILL_MODEL`
 - `PAPER_DISTILL_BASE_URL`
 - `PAPER_DISTILL_API_KEY`
+- `PAPER_DISTILL_TARGET_LANGUAGE`
 
 ## Host adaptation notes
 
@@ -221,7 +225,9 @@ Optional environment variables already supported by the CLI:
 - Do not reimplement `app.paper_distill` internals in the host adapter.
 - Keep host-specific tool schemas, slash commands, or permission models outside this bundle.
 - If the host needs machine-native status parsing, read the generated artifact files in addition to stdout.
-- When configuring prompts or adapters around this bundle, keep the generated knowledge maps, plans, questions, answers, and conversation records in Chinese.
+- When configuring prompts or adapters around this bundle, preserve the user's
+  target language choice for knowledge maps, plans, questions, answers, and
+  conversation records.
 
 ## Non-goals
 

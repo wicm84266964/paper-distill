@@ -8,6 +8,7 @@ from pathlib import Path
 from app.paper_distill.backends import build_backend, build_backend_identity
 from app.paper_distill.cache import CacheMetadataStore, build_cache_key, build_prefix_hash
 from app.paper_distill.fs import absolute_path, ensure_safe_file_target
+from app.paper_distill.language import normalize_target_language, target_language_version_key
 from app.paper_distill.layout import PaperPaths, build_paper_id, build_paths, build_source_hash, extract_title, normalize_markdown_source
 from app.paper_distill.models import (
     Checkpoint,
@@ -42,6 +43,10 @@ class PaperDistillService:
     def run(self, request: RunRequest) -> DistillRunResult:
         if request.batch_size <= 0:
             raise ValueError("batch_size must be greater than zero.")
+        target_language = normalize_target_language(request.target_language)
+        prompt_version = _version_for_target_language(PROMPT_VERSION, target_language)
+        knowledge_map_version = _version_for_target_language(KNOWLEDGE_MAP_VERSION, target_language)
+        conversation_plan_version = _version_for_target_language(CONVERSATION_PLAN_VERSION, target_language)
 
         paper_path = absolute_path(request.paper_path)
         ensure_safe_file_target(paper_path)
@@ -79,11 +84,15 @@ class PaperDistillService:
             timeout_seconds=request.backend.timeout_seconds,
             temperature=request.backend.temperature,
         )
-        prefix_text = build_stable_prefix(title=title, normalized_source=normalized_source)
+        prefix_text = build_stable_prefix(
+            title=title,
+            normalized_source=normalized_source,
+            target_language=target_language,
+        )
         prefix_hash = build_prefix_hash(prefix_text)
         cache_key = build_cache_key(
             source_hash=source_hash,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=prompt_version,
             backend_identity=backend_identity,
         )
         prepared_prefix = backend.prepare_prefix(
@@ -92,7 +101,7 @@ class PaperDistillService:
             prefix_hash=prefix_hash,
             paper_id=paper_id,
             source_hash=source_hash,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=prompt_version,
         )
 
         knowledge_map = self._load_or_build_knowledge_map(
@@ -104,6 +113,8 @@ class PaperDistillService:
             paper_id=paper_id,
             source_hash=source_hash,
             normalized_source=normalized_source,
+            target_language=target_language,
+            knowledge_map_version=knowledge_map_version,
         )
         resolved_target_count = resolve_target_count(
             request=request,
@@ -132,6 +143,8 @@ class PaperDistillService:
             knowledge_map=knowledge_map,
             target_turn_count=effective_target_count,
             existing_entries=conversation_entries,
+            target_language=target_language,
+            conversation_plan_version=conversation_plan_version,
         )
 
         checkpoint = artifact_store.load_checkpoint(paths)
@@ -150,6 +163,7 @@ class PaperDistillService:
             model_name=request.backend.model_name,
             target_count=effective_target_count,
             batch_size=request.batch_size,
+            prompt_version=prompt_version,
         )
         artifact_store.save_checkpoint(paths, checkpoint)
 
@@ -192,7 +206,7 @@ class PaperDistillService:
                     backend_kind=request.backend.kind,
                     backend_ref=prepared_prefix.backend_ref,
                     model_name=request.backend.model_name,
-                    prompt_version=PROMPT_VERSION,
+                    prompt_version=prompt_version,
                     target_count=effective_target_count,
                     batch_size=request.batch_size,
                     accepted_count=accepted_count,
@@ -226,6 +240,7 @@ class PaperDistillService:
                     existing_thread_turns=existing_thread_turns,
                     existing_questions=tuple(entry.question for entry in conversation_entries),
                     knowledge_map_outline=_knowledge_map_outline(knowledge_map),
+                    target_language=target_language,
                 ),
                 prepared_prefix=prepared_prefix,
             )
@@ -304,7 +319,7 @@ class PaperDistillService:
                     evidence_text=candidate.evidence_text.strip(),
                     evidence_locator=candidate.evidence_locator.strip(),
                     source_hash=source_hash,
-                    prompt_version=PROMPT_VERSION,
+                    prompt_version=prompt_version,
                     backend_kind=request.backend.kind,
                     model_name=request.backend.model_name,
                 )
@@ -340,7 +355,7 @@ class PaperDistillService:
                 backend_kind=request.backend.kind,
                 backend_ref=prepared_prefix.backend_ref,
                 model_name=request.backend.model_name,
-                prompt_version=PROMPT_VERSION,
+                prompt_version=prompt_version,
                 target_count=effective_target_count,
                 batch_size=request.batch_size,
                 accepted_count=accepted_count,
@@ -373,18 +388,24 @@ class PaperDistillService:
         paper_id: str,
         source_hash: str,
         normalized_source: str,
+        target_language: str,
+        knowledge_map_version: str,
     ) -> KnowledgeMap:
         loaded_map = artifact_store.load_knowledge_map(paths)
         if (
             loaded_map is not None
             and loaded_map.paper_id == paper_id
             and loaded_map.source_hash == source_hash
-            and loaded_map.knowledge_map_version == KNOWLEDGE_MAP_VERSION
+            and loaded_map.knowledge_map_version == knowledge_map_version
         ):
             return loaded_map
 
         raw_payload = backend.generate_json_object(
-            prefix_text=build_knowledge_map_prefix(title=title, normalized_source=normalized_source),
+            prefix_text=build_knowledge_map_prefix(
+                title=title,
+                normalized_source=normalized_source,
+                target_language=target_language,
+            ),
             suffix_text=build_knowledge_map_suffix(),
             prepared_prefix=prepared_prefix,
         )
@@ -394,6 +415,7 @@ class PaperDistillService:
             paper_title=title,
             source_hash=source_hash,
             source_language=_infer_source_language(normalized_source),
+            knowledge_map_version=knowledge_map_version,
         )
         artifact_store.save_knowledge_map(paths, knowledge_map)
         return knowledge_map
@@ -411,13 +433,15 @@ class PaperDistillService:
         knowledge_map: KnowledgeMap,
         target_turn_count: int,
         existing_entries: list[ConversationTurnEntry],
+        target_language: str,
+        conversation_plan_version: str,
     ) -> ConversationPlan:
         loaded_plan = artifact_store.load_conversation_plan(paths)
         if (
             loaded_plan is not None
             and loaded_plan.paper_id == paper_id
             and loaded_plan.source_hash == source_hash
-            and loaded_plan.conversation_plan_version == CONVERSATION_PLAN_VERSION
+            and loaded_plan.conversation_plan_version == conversation_plan_version
         ):
             plan = loaded_plan
         else:
@@ -425,6 +449,7 @@ class PaperDistillService:
                 prefix_text=build_conversation_plan_prefix(
                     title=title,
                     knowledge_map_outline=_knowledge_map_outline(knowledge_map),
+                    target_language=target_language,
                 ),
                 suffix_text=build_conversation_plan_suffix(target_turn_count=target_turn_count),
                 prepared_prefix=prepared_prefix,
@@ -436,6 +461,7 @@ class PaperDistillService:
                 source_hash=source_hash,
                 target_turn_count=target_turn_count,
                 knowledge_map=knowledge_map,
+                conversation_plan_version=conversation_plan_version,
             )
 
         resized_plan = _resize_conversation_plan(
@@ -443,6 +469,7 @@ class PaperDistillService:
             target_turn_count=target_turn_count,
             existing_entries=existing_entries,
             knowledge_map=knowledge_map,
+            conversation_plan_version=conversation_plan_version,
         )
         artifact_store.save_conversation_plan(paths, resized_plan)
         return resized_plan
@@ -464,6 +491,7 @@ class PaperDistillService:
         model_name: str,
         target_count: int,
         batch_size: int,
+        prompt_version: str,
     ) -> Checkpoint:
         accepted_count = len(entries)
         next_ordinal = max((entry.ordinal for entry in entries), default=0) + 1
@@ -479,7 +507,7 @@ class PaperDistillService:
                 backend_kind=backend_kind,
                 backend_ref=backend_ref,
                 model_name=model_name,
-                prompt_version=PROMPT_VERSION,
+                prompt_version=prompt_version,
                 target_count=target_count,
                 batch_size=batch_size,
                 accepted_count=accepted_count,
@@ -494,7 +522,7 @@ class PaperDistillService:
             or checkpoint.backend_identity != backend_identity
             or checkpoint.prefix_hash != prefix_hash
             or checkpoint.model_name != model_name
-            or checkpoint.prompt_version != PROMPT_VERSION
+            or checkpoint.prompt_version != prompt_version
             or checkpoint.backend_kind != backend_kind
         )
         if mismatched_checkpoint:
@@ -513,7 +541,7 @@ class PaperDistillService:
             backend_kind=backend_kind,
             backend_ref=backend_ref,
             model_name=model_name,
-            prompt_version=PROMPT_VERSION,
+            prompt_version=prompt_version,
             target_count=target_count,
             batch_size=batch_size,
             accepted_count=accepted_count,
@@ -527,6 +555,10 @@ class PaperDistillService:
 
 def build_service() -> PaperDistillService:
     return PaperDistillService()
+
+
+def _version_for_target_language(base_version: str, target_language: str) -> str:
+    return f"{base_version}/lang-{target_language_version_key(target_language)}"
 
 
 def resolve_target_count(
@@ -639,6 +671,7 @@ def _normalize_knowledge_map_payload(
     paper_title: str,
     source_hash: str,
     source_language: str,
+    knowledge_map_version: str = KNOWLEDGE_MAP_VERSION,
 ) -> KnowledgeMap:
     model_language = _normalize_language(_coerce_string(payload.get("primary_language"), default="mixed"))
     resolved_language = source_language if source_language != "mixed" else model_language
@@ -646,7 +679,7 @@ def _normalize_knowledge_map_payload(
         "paper_id": paper_id,
         "paper_title": paper_title,
         "source_hash": source_hash,
-        "knowledge_map_version": KNOWLEDGE_MAP_VERSION,
+        "knowledge_map_version": knowledge_map_version,
         "content_profile": _coerce_string(payload.get("content_profile"), default="mixed_or_unclear"),
         "primary_language": resolved_language,
         "study_goal": _coerce_string(payload.get("study_goal"), default=paper_title),
@@ -671,6 +704,7 @@ def _normalize_conversation_plan_payload(
     source_hash: str,
     target_turn_count: int,
     knowledge_map: KnowledgeMap,
+    conversation_plan_version: str = CONVERSATION_PLAN_VERSION,
 ) -> ConversationPlan:
     raw_threads = payload.get("threads")
     thread_limit = _estimate_thread_count(
@@ -711,7 +745,7 @@ def _normalize_conversation_plan_payload(
         paper_id=paper_id,
         paper_title=paper_title,
         source_hash=source_hash,
-        conversation_plan_version=CONVERSATION_PLAN_VERSION,
+        conversation_plan_version=conversation_plan_version,
         target_turn_count=max(target_turn_count, len(rebalanced_threads)),
         threads=rebalanced_threads,
         created_at=utc_now(),
@@ -724,6 +758,7 @@ def _resize_conversation_plan(
     target_turn_count: int,
     existing_entries: list[ConversationTurnEntry],
     knowledge_map: KnowledgeMap,
+    conversation_plan_version: str = CONVERSATION_PLAN_VERSION,
 ) -> ConversationPlan:
     if not conversation_plan.threads:
         rebuilt_threads = tuple(
@@ -736,7 +771,7 @@ def _resize_conversation_plan(
             paper_id=conversation_plan.paper_id,
             paper_title=conversation_plan.paper_title,
             source_hash=conversation_plan.source_hash,
-            conversation_plan_version=CONVERSATION_PLAN_VERSION,
+            conversation_plan_version=conversation_plan_version,
             target_turn_count=target_turn_count,
             threads=rebuilt_threads,
             created_at=utc_now(),
@@ -756,14 +791,14 @@ def _resize_conversation_plan(
     if (
         conversation_plan.target_turn_count == adjusted_target
         and conversation_plan.threads == resized_threads
-        and conversation_plan.conversation_plan_version == CONVERSATION_PLAN_VERSION
+        and conversation_plan.conversation_plan_version == conversation_plan_version
     ):
         return conversation_plan
     return ConversationPlan(
         paper_id=conversation_plan.paper_id,
         paper_title=conversation_plan.paper_title,
         source_hash=conversation_plan.source_hash,
-        conversation_plan_version=CONVERSATION_PLAN_VERSION,
+        conversation_plan_version=conversation_plan_version,
         target_turn_count=adjusted_target,
         threads=resized_threads,
         created_at=conversation_plan.created_at,

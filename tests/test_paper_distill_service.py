@@ -17,6 +17,7 @@ from app.paper_distill.service import (
     _question_lacks_explicit_anchor,
     _question_requests_unsupported_conditions,
     _reuses_evidence_cluster,
+    _version_for_target_language,
     build_service,
     estimate_target_count,
 )
@@ -88,6 +89,16 @@ class PaperDistillServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(knowledge_map.primary_language, "zh")
+
+    def test_target_language_changes_prompt_version_key(self) -> None:
+        self.assertEqual(
+            _version_for_target_language("paper_distill/test/v1", "English"),
+            "paper_distill/test/v1/lang-english",
+        )
+        self.assertEqual(
+            _version_for_target_language("paper_distill/test/v1", "same as source"),
+            "paper_distill/test/v1/lang-source-language",
+        )
 
     def test_has_unresolved_reference_rejects_figure_table_shorthand(self) -> None:
         knowledge_map = self._sample_knowledge_map()
@@ -446,6 +457,36 @@ class PaperDistillServiceTests(unittest.TestCase):
             self.assertIn("study_goal", payload)
             self.assertIn("key_findings", payload)
 
+    def test_run_records_target_language_in_prompt_versions(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            workspace_root = Path(temporary_directory)
+            paper_path = workspace_root / "paper.md"
+            _ = paper_path.write_text(SAMPLE_PAPER, encoding="utf-8")
+            artifacts_root = workspace_root / "artifacts"
+            cache_root = workspace_root / "cache"
+            service = build_service()
+            backend = BackendConfig(kind="mock", model_name="mock-model")
+
+            result = service.run(
+                RunRequest(
+                    paper_path=paper_path,
+                    artifacts_root=artifacts_root,
+                    cache_root=cache_root,
+                    target_count=1,
+                    batch_size=1,
+                    backend=backend,
+                    target_language="English",
+                )
+            )
+
+            checkpoint_payload = json.loads((result.artifact_dir / "checkpoint.json").read_text(encoding="utf-8"))
+            knowledge_map_payload = json.loads((result.artifact_dir / "knowledge_map.json").read_text(encoding="utf-8"))
+            conversation_plan_payload = json.loads((result.artifact_dir / "conversation_plan.json").read_text(encoding="utf-8"))
+
+            self.assertIn("/lang-english", checkpoint_payload["prompt_version"])
+            self.assertIn("/lang-english", knowledge_map_payload["knowledge_map_version"])
+            self.assertIn("/lang-english", conversation_plan_payload["conversation_plan_version"])
+
     def test_run_completes_early_when_generation_saturates(self) -> None:
         class SaturatingBackend:
             def __init__(self) -> None:
@@ -607,7 +648,7 @@ class PaperDistillServiceTests(unittest.TestCase):
 
             with patch(
                 "app.paper_distill.service.build_stable_prefix",
-                side_effect=lambda *, title, normalized_source: f"MUTATED\n{normalized_source}",
+                side_effect=lambda *, title, normalized_source, target_language="Chinese": f"MUTATED\n{normalized_source}",
             ):
                 with self.assertRaisesRegex(ValueError, "Use --restart"):
                     _ = service.run(

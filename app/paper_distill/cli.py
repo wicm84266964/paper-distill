@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from pathlib import Path
 
 from app.paper_distill.fs import absolute_path
+from app.paper_distill.language import DEFAULT_TARGET_LANGUAGE, normalize_target_language
 from app.paper_distill.exporters import PaperDistillExporter
 from app.paper_distill.layout import DEFAULT_ARTIFACTS_ROOT, DEFAULT_CACHE_ROOT
 from app.paper_distill.models import BackendConfig, ExportFormat, ExportRequest, RunRequest
@@ -32,6 +33,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     _ = run_parser.add_argument("--workspace-root", default=None)
     _ = run_parser.add_argument("--artifacts-root", default=None)
     _ = run_parser.add_argument("--cache-root", default=None)
+    _ = run_parser.add_argument(
+        "--target-language",
+        default=os.getenv("PAPER_DISTILL_TARGET_LANGUAGE", DEFAULT_TARGET_LANGUAGE),
+        help="Language for generated QA, knowledge maps, and conversations.",
+    )
     _ = run_parser.add_argument(
         "--backend",
         choices=["mock", "openai-compatible"],
@@ -100,6 +106,9 @@ def _run_command(args: argparse.Namespace) -> int:
         min_target_count=int(getattr(args, "min_target_count")),
         max_target_count=int(getattr(args, "max_target_count")),
         restart=bool(getattr(args, "restart", False)),
+        target_language=normalize_target_language(
+            _optional_string(getattr(args, "target_language", None))
+        ),
     )
     try:
         result = service.run(request)
