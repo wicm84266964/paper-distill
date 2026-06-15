@@ -2,18 +2,26 @@
 
 中文说明见 [README.zh-CN.md](README.zh-CN.md).
 
-Standalone Python package and Codex skill for distilling one Markdown paper into
-Chinese-first training records.
+Corpus-oriented Python package and Codex skill for distilling many Markdown
+papers into Chinese-first QA and multi-turn conversation training datasets.
+
+The execution unit is one paper at a time, but the intended workflow is a
+large literature corpus: run each paper into its own resumable artifact
+directory, then export all paper artifacts into one combined dataset file.
 
 ## What It Does
 
-- Runs one Markdown paper per `paper-distill run` invocation.
+- Builds large paper-derived datasets from hundreds or thousands of Markdown
+  papers by running one resumable paper job per invocation.
 - Stores each paper in its own artifact directory under the shared
   `artifacts_root`.
-- Exports either one paper or all papers under an `artifacts_root` into one
-  combined dataset file.
-- Builds a reusable paper knowledge map and conversation plan.
-- Exports QA records as `json`, `jsonl`, or `conversation-jsonl`.
+- Builds a reusable paper knowledge map and a per-paper conversation plan.
+- Generates multi-turn conversation turns for each paper; each paper can export
+  one or more conversation records, grouped by planned thread.
+- Exports either one paper or every valid paper under an `artifacts_root` into
+  one combined dataset file.
+- Exports QA records and conversation records as `json`, `jsonl`, or
+  `conversation-jsonl`.
 - Writes generated questions, answers, knowledge maps, and conversations in
   Chinese even when the source paper is English.
 - Supports resumable runs and deterministic smoke tests through a built-in
@@ -42,7 +50,7 @@ python -m pip install -e ".[dev]"
 python -m pytest tests -q
 ```
 
-## Quick Smoke Test
+## Single-paper Smoke Test
 
 Create a tiny Markdown paper:
 
@@ -56,23 +64,26 @@ scientific text. The method records evidence and exports training examples.
 "@ | Set-Content -Encoding UTF8 papers\example.md
 ```
 
-Run distillation with the mock backend:
+Run one paper job with the mock backend:
 
 ```powershell
 paper-distill run --paper papers\example.md --target-count 3 --batch-size 2 --backend mock
 ```
 
-Export conversation records:
+Export conversation records from the shared artifacts root:
 
 ```powershell
 paper-distill export --artifacts-root data\paper_distill\papers --format conversation-jsonl --output data\paper_distill\conversation.jsonl
 ```
 
-## Multi-paper Workflow
+## Corpus Workflow
 
-`paper-distill run` is intentionally single-paper. It does not schedule a
-multi-paper queue or manage worker concurrency. For a corpus, call `run` once per
-paper, using the same `--artifacts-root`:
+`paper-distill run` is intentionally single-paper because each paper needs its
+own checkpoint, knowledge map, conversation plan, conversation ledger, and QA
+ledger. This makes large runs easier to resume and audit.
+
+For a literature corpus, call `run` once per paper, using the same
+`--artifacts-root`:
 
 ```powershell
 paper-distill run --paper papers\a.md --target-count 20 --backend openai-compatible --artifacts-root data\paper_distill\papers
@@ -88,6 +99,20 @@ data/paper_distill/papers/
   paper-b--<hash>/
   paper-c--<hash>/
 ```
+
+Inside each paper directory, the tool writes the paper-specific artifacts:
+
+```text
+qa_entries.jsonl
+conversation_entries.jsonl
+checkpoint.json
+knowledge_map.json
+conversation_plan.json
+```
+
+`conversation_entries.jsonl` stores generated conversation turns. During
+`conversation-jsonl` export, turns are grouped by planned thread into multi-turn
+conversation records with `messages` and `turns` arrays.
 
 Then export the whole corpus into one dataset file:
 
@@ -105,6 +130,10 @@ paper-distill export --artifact-dir data\paper_distill\papers\<paper_id> --forma
 External scripts may run multiple `paper-distill run` commands in parallel, but
 each paper should write to its own paper artifact directory. Avoid launching two
 workers for the same source paper and same `artifacts_root` at the same time.
+
+`--target-count` is the target number of accepted conversation turns for one
+paper. It is not the number of papers to process. `--batch-size` controls how
+many candidate turns the backend asks for in one generation call.
 
 ## Real Model Backend
 

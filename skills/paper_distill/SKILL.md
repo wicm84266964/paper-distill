@@ -1,30 +1,36 @@
 ---
 name: paper-distill
-description: Distill one markdown paper into structured QA records by wrapping the existing standalone paper-distill CLI.
+description: Build Chinese-first QA and multi-turn conversation datasets from markdown paper corpora by running one resumable paper-distill job per paper and exporting all paper artifacts into combined JSON/JSONL datasets.
 ---
 
 # Paper Distill Skill
 
 ## Purpose
 
-Use this skill when a coding agent needs to distill a single markdown paper into structured question-answer training data, reusable paper knowledge maps, or conversation-style training records without reimplementing the `paper_distill` subsystem.
+Use this skill when a coding agent needs to build a training dataset from a
+markdown paper corpus by distilling each paper into structured question-answer
+records, reusable paper knowledge maps, and multi-turn conversation records
+without reimplementing the `paper_distill` subsystem.
 
 This bundle is intentionally host-agnostic. It teaches a host how to invoke the already-existing command surface instead of embedding host-specific tool schemas.
 
 All distillation outputs should be written in Chinese, even when the source paper is in English, because the downstream training target is a Chinese-base model.
 
-`paper-distill run` is a single-paper operation. For a corpus, invoke `run` once
+`paper-distill run` is a single-paper operation by design, but the intended
+workflow is corpus-scale. For hundreds or thousands of papers, invoke `run` once
 per paper, with all papers sharing the same `--artifacts-root`. Each paper gets
-its own artifact directory. `paper-distill export --artifacts-root ...` then
-merges all valid paper artifact directories under that root into one output
-dataset file.
+its own artifact directory with a checkpoint, knowledge map, conversation plan,
+conversation ledger, and QA ledger. `paper-distill export --artifacts-root ...`
+then merges all valid paper artifact directories under that root into one
+output dataset file.
 
 ## When to use
 
-- The user wants to distill one markdown paper into training QA pairs.
-- The user wants to export one paper into one or more conversation-oriented training records.
-- The user wants to build a multi-paper training dataset by running multiple
-  single-paper distillation jobs and exporting the shared artifacts root.
+- The user wants to build a dataset from many markdown papers.
+- The user wants to distill one markdown paper as one unit of a larger corpus workflow.
+- The user wants each paper to produce multi-turn conversation records and QA pairs.
+- The user wants to build a multi-paper training dataset by running one
+  resumable distillation job per paper and exporting the shared artifacts root.
 - The user wants to resume or restart a paper-specific distillation run.
 - The user wants to export merged paper-distill outputs to `json` or `jsonl`.
 - The user wants English-language papers to be distilled into Chinese training data.
@@ -148,8 +154,8 @@ Export one paper as one or more conversation records:
 paper-distill export --artifact-dir data/paper_distill/papers/<paper_id> --format conversation-jsonl --output data/paper_distill/conversation.jsonl
 ```
 
-Build a multi-paper dataset by running each paper separately and exporting the
-shared artifacts root:
+Build a corpus dataset by running each paper separately and exporting the shared
+artifacts root:
 
 ```powershell
 paper-distill run --paper papers/a.md --target-count 20 --backend openai-compatible --artifacts-root data/paper_distill/papers
@@ -160,6 +166,10 @@ paper-distill export --artifacts-root data/paper_distill/papers --format convers
 
 External orchestration may run multiple papers in parallel, but never run two
 workers against the same source paper and same artifacts root at the same time.
+
+`--target-count` is the target number of accepted conversation turns for one
+paper, not the number of papers. `--batch-size` controls how many candidate
+turns the backend requests per generation call.
 
 If `paper-distill` is not installed, run the same subcommands through:
 

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "paper-distill-skill-bundle"
 version = "0.2.0"
-description = "Standalone paper-distill skill bundle with Chinese-first distillation outputs."
+description = "Corpus-oriented paper distillation bundle for Chinese-first QA and multi-turn conversation datasets."
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "Paper Distill contributors" }]
