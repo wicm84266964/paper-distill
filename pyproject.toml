@@ -3,7 +3,7 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "paper-distill-skill-bundle"
+name = "paper-distill"
 version = "0.2.0"
 description = "Corpus-oriented paper distillation bundle for Chinese-first QA and multi-turn conversation datasets."
 readme = "README.md"

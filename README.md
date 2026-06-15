@@ -1,9 +1,9 @@
-# Paper Distill Skill Bundle
+# Paper Distill
 
 中文说明见 [README.zh-CN.md](README.zh-CN.md).
 
-Corpus-oriented Python package and Codex skill for distilling many Markdown
-papers into Chinese-first QA and multi-turn conversation training datasets.
+Corpus-oriented Python package for distilling many Markdown papers into
+Chinese-first QA and multi-turn conversation training datasets.
 
 The execution unit is one paper at a time, but the intended workflow is a
 large literature corpus: run each paper into its own resumable artifact
@@ -170,16 +170,17 @@ of the same paper resume the same artifact directory unless `--restart` is used.
 Use `--workspace-root`, `--artifacts-root`, and `--cache-root` to place outputs
 somewhere else.
 
-## Skill Contract
+## Agent Contract
 
-The Codex skill entrypoint is:
+An optional agent-facing contract is included at:
 
 ```text
 skills/paper_distill/SKILL.md
 ```
 
-That file explains when an agent should use this package and how to call the
-CLI without reimplementing the distillation logic.
+That file explains when an automation agent should use this package and how to
+call the CLI without reimplementing the distillation logic. It is optional; the
+Python CLI is the stable public interface.
 
 ## License
 

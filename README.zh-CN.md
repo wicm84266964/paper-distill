@@ -1,7 +1,7 @@
-# Paper Distill Skill Bundle
+# Paper Distill
 
 用于把大量 Markdown 论文蒸馏成中文优先 QA / 多轮对话训练数据集的独立
-Python 包和 Codex skill。
+Python 包。
 
 它的执行粒度是“每次处理一篇论文”，但目标工作流是文献库级别的：对上百篇或
 上千篇论文逐篇运行、逐篇保存可续跑 artifact，最后把所有论文 artifact 合并导出
@@ -160,16 +160,16 @@ data/paper_distill/papers/<paper_id>/
 
 可以用 `--workspace-root`、`--artifacts-root`、`--cache-root` 调整输出位置。
 
-## Skill 入口
+## 智能体合约
 
-Codex skill 合约文件在：
+仓库内包含一个可选的智能体调用合约：
 
 ```text
 skills/paper_distill/SKILL.md
 ```
 
-这个文件说明智能体什么时候应该使用本包，以及如何调用 CLI，而不是重新实现
-论文蒸馏逻辑。
+这个文件说明自动化智能体什么时候应该使用本包，以及如何调用 CLI，而不是重新
+实现论文蒸馏逻辑。它不是必需入口；稳定的公开接口是 Python CLI。
 
 ## 许可证
 
